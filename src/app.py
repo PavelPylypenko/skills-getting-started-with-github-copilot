@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 from pathlib import Path
+from pydantic import BaseModel
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -88,18 +89,40 @@ def get_activities():
     return activities
 
 
+from pydantic import BaseModel
+
+class SignupRequest(BaseModel):
+    email: str
+
 @app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
+def signup_for_activity(activity_name: str, request: SignupRequest):
     """Sign up a student for an activity"""
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
     # Validate student is not already signed up
-    if email in activities[activity_name]["participants"]:
+    if request.email in activities[activity_name]["participants"]:
         raise HTTPException(status_code=400, detail="Student already signed up for this activity")
     # Get the specific activity
     activity = activities[activity_name]
 
     # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
+    activity["participants"].append(request.email)
+    return {"message": f"Signed up {request.email} for {activity_name}"}
+
+
+class UnregisterRequest(BaseModel):
+    email: str
+    activity: str
+
+@app.post("/unregister")
+def unregister_participant(request: UnregisterRequest):
+    activity = activities.get(request.activity)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    if request.email not in activity["participants"]:
+        raise HTTPException(status_code=400, detail="Participant not registered")
+
+    activity["participants"].remove(request.email)
+    return {"message": "Participant unregistered successfully"}
