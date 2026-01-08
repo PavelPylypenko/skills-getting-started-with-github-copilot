@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 from pathlib import Path
+from pydantic import BaseModel
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -38,7 +39,43 @@ activities = {
         "schedule": "Mondays, Wednesdays, Fridays, 2:00 PM - 3:00 PM",
         "max_participants": 30,
         "participants": ["john@mergington.edu", "olivia@mergington.edu"]
-    }
+    },
+    "Soccer Team": {
+        "description": "Join the school soccer team and compete in matches",
+        "schedule": "Tuesdays and Thursdays, 4:00 PM - 5:30 PM",
+        "max_participants": 22,
+        "participants": []
+    },
+    "Basketball Team": {
+        "description": "Practice basketball skills and play in tournaments",
+        "schedule": "Wednesdays and Fridays, 3:30 PM - 5:00 PM",
+        "max_participants": 15,
+        "participants": []
+    },
+    "Art Club": {
+        "description": "Explore your creativity through painting and drawing",
+        "schedule": "Mondays, 3:30 PM - 5:00 PM",
+        "max_participants": 10,
+        "participants": []
+    },
+    "Drama Club": {
+        "description": "Learn acting and participate in school plays",
+        "schedule": "Thursdays, 4:00 PM - 5:30 PM",
+        "max_participants": 15,
+        "participants": []
+    },
+    "Debate Team": {
+        "description": "Develop public speaking and argumentation skills",
+        "schedule": "Fridays, 3:30 PM - 5:00 PM",
+        "max_participants": 12,
+        "participants": []
+    },
+    "Math Club": {
+        "description": "Solve challenging math problems and compete in contests",
+        "schedule": "Wednesdays, 3:30 PM - 4:30 PM",
+        "max_participants": 20,
+        "participants": []
+    },
 }
 
 
@@ -52,16 +89,40 @@ def get_activities():
     return activities
 
 
+from pydantic import BaseModel
+
+class SignupRequest(BaseModel):
+    email: str
+
 @app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
+def signup_for_activity(activity_name: str, request: SignupRequest):
     """Sign up a student for an activity"""
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
-
+    # Validate student is not already signed up
+    if request.email in activities[activity_name]["participants"]:
+        raise HTTPException(status_code=400, detail="Student already signed up for this activity")
     # Get the specific activity
     activity = activities[activity_name]
 
     # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
+    activity["participants"].append(request.email)
+    return {"message": f"Signed up {request.email} for {activity_name}"}
+
+
+class UnregisterRequest(BaseModel):
+    email: str
+    activity: str
+
+@app.post("/unregister")
+def unregister_participant(request: UnregisterRequest):
+    activity = activities.get(request.activity)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    if request.email not in activity["participants"]:
+        raise HTTPException(status_code=400, detail="Participant not registered")
+
+    activity["participants"].remove(request.email)
+    return {"message": "Participant unregistered successfully"}
